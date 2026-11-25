@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: logisticmaster-teste
+    runtime: docker
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ENABLE_DEMO_USERS
+        value: "true"
+      - key: TRUST_PROXY
+        value: "1"

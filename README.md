@@ -1,372 +1,168 @@
-# 🚚 LogisticMaster
+# LogisticMaster — Protótipo operacional
 
-### Sistema inteligente de gestão e execução logística para pequenas distribuidoras B2B.
+O LogisticMaster foi reorganizado como uma plataforma focada na camada logística das distribuidoras: entrada e normalização de pedidos, cadastro de clientes, frota, cálculo de capacidade, carregamento LIFO, prioridade FEFO, despacho, geolocalização, execução da entrega, ocorrências e logística reversa. O ERP/sistema de vendas continua sendo a origem dos pedidos e documentos fiscais.
 
-**Do pedido à baixa da entrega: menos desperdício, mais rastreabilidade e decisões orientadas à margem.**
+A parte financeira do sistema é restrita a **custos operacionais** usados nas simulações logísticas (combustível, equipe, reentrega e reprocessamento). O produto não inclui módulos de cobrança, meios de pagamento ou tesouraria.
 
-[![Node.js](https://img.shields.io/badge/Node.js-22.5%2B-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
-![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
-![React](https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB)
-![Vite](https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white)
-![Express](https://img.shields.io/badge/Express-000000?logo=express&logoColor=white)
-![SQLite](https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white)
-![PWA](https://img.shields.io/badge/PWA-5A0FC8?logo=pwa&logoColor=white)
-![Status](https://img.shields.io/badge/status-prot%C3%B3tipo%20funcional-blue)
+## Requisitos
 
-**[📂 Código-fonte](https://github.com/gab3souzza/logistic-master) · [📐 Especificação técnica](docs/ESPECIFICACAO-DO-PROTOTIPO.md) · [🧪 Relatório de validação](docs/RELATORIO-DE-VALIDACAO.md)**
+- Node.js 22.5 ou superior (usa o módulo nativo `node:sqlite`; recomendado Node 22.16+).
+- npm.
+- Conexão com a internet para instalar dependências, geocodificar endereços e usar mapas externos.
+- Permissão de geolocalização do navegador; para produção, publique via HTTPS.
 
----
+## Executar localmente
 
-## 🎯 O problema
-
-Pequenas distribuidoras de alimentos que operam com frotas de 1 a 5 caminhões frequentemente dependem de planilhas, pranchetas e conversas no WhatsApp para organizar suas entregas.
-
-O resultado são falhas operacionais que consomem a margem de lucro:
-
-| Problema | Consequência operacional |
-|---|---|
-| 🚛 Carregamento desordenado | Mercadorias ficam soterradas e aumentam o tempo de descarga. |
-| ⏳ Falta de rastreabilidade FEFO | Produtos próximos do vencimento permanecem parados no estoque. |
-| 🔁 Entregas frustradas | Portas fechadas, recusas e janelas perdidas provocam reentregas. |
-| 📉 Decisões sem análise de margem | Fretes extras e desvios podem transformar entregas em prejuízo. |
-
-O projeto utiliza uma estimativa operacional de aproximadamente **R$ 89,00 por ocorrência de reentrega**, considerando combustível e horas de trabalho. É uma referência ilustrativa, não um valor universal de mercado.
-
-### A proposta
-
-O LogisticMaster organiza a operação física da distribuidora em um único fluxo digital, conectando pedidos, estoque, planejamento de carregamento, motoristas e comprovantes de entrega.
-
-**A ideia central é simples: proteger a margem antes que o caminhão saia do galpão e acompanhar a operação até a última entrega.**
-
----
-
-## ⚙️ Como funciona
-
-O sistema acompanha o ciclo logístico de ponta a ponta:
-
-```mermaid
-flowchart TD
-    A["📥 Entrada de pedidos"] --> B["🔎 Validação e quarentena"]
-    B --> C["📦 Auditoria de lotes FEFO"]
-    C --> D["🧠 Planejamento de despacho"]
-    D --> E["🚛 Carregamento LIFO"]
-    E --> F["📱 Rota pelo aplicativo do motorista"]
-    F --> G{"Entrega realizada?"}
-    G -->|Sim| H["📸 Comprovante e baixa digital"]
-    G -->|Não| I["🔄 Ocorrência e logística reversa"]
-    I --> J["📋 Reagendamento ou retorno"]
-    H --> K["📊 Atualização da operação"]
-    J --> K
-```
-
-### 1. Central de Operações — Web Desktop
-
-O painel administrativo concentra o controle da operação.
-
-**Entrada e validação de pedidos**
-- Cadastro manual e importação de arquivos CSV, JSON e XML de NF-e.
-- Leitura de informações de rastreabilidade, incluindo `rastro`, `nLote` e `dVal`, quando disponíveis no XML.
-- API REST para integração com sistemas externos.
-- Integração preparada para recebimento de pedidos pelo WhatsApp Cloud API.
-
-**Auditoria de estoque e FEFO**
-- Pedidos incompletos são direcionados para `pendente_complemento`.
-- Lotes com validade igual ou inferior a 65 dias recebem prioridade urgente.
-- Lotes vencidos recebem bloqueio operacional automático (`bloqueio_fiscal`).
-- Priorização de saída conforme o vencimento: First Expire, First Out (FEFO).
-
-**Motor de despacho e carregamento**
-- Agrupamento de entregas por bairro e raio geográfico.
-- Respeito aos limites de peso bruto e cubagem do veículo.
-- Priorização de pedidos reagendados para D+1.
-- Ordenação reversa das paradas para facilitar a descarga na sequência da rota.
-- Posição 1 do carregamento junto à porta do baú, priorizando o primeiro destino.
-
-**Calculadora Hoje vs. Amanhã**
-- Compara o custo do envio imediato com a possibilidade de consolidação no próximo dia.
-- Considera quilometragem adicional, horas da equipe e frete avulso.
-- Apresenta uma recomendação baseada na margem líquida estimada.
-- Envio contrário à recomendação exige autorização do perfil `MANAGER`.
-
-**Logística reversa e ocorrências**
-- Registro de mercadorias retornadas.
-- Classificação entre `reagendado_d1` e `baixado_avaria`.
-- Atualização da disponibilidade física da carga no veículo.
-- Regra operacional de corte de 500 metros para cancelamentos em trânsito.
-
-### 2. Aplicativo do Motorista — PWA Offline-First
-
-O motorista utiliza uma aplicação web instalável, projetada para continuar operando mesmo com instabilidade de conexão.
-
-**Recursos disponíveis:**
-- Romaneio digital vinculado ao motorista.
-- DANFE em PDF disponível offline.
-- Armazenamento local de documentos e eventos com IndexedDB.
-- Sincronização automática das operações pendentes.
-- Geolocalização e validação de geofence de 30 metros.
-- Entregas integrais ou parciais.
-- Registro fotográfico obrigatório nas baixas previstas pelo fluxo.
-- Assinatura manuscrita em canvas.
-- Identificação dos eventos por `clientEventId` para processamento idempotente.
-- Abertura de rotas e destinos no Waze e Google Maps.
-
-**Comunicação operacional com um toque:**
-
-| Ação | Finalidade |
-|---|---|
-| 📍 Cheguei | Informa a chegada ao destino. |
-| ⏳ Aguardando | Comunica uma espera no cliente. |
-| 🆘 Preciso de ajuda | Solicita suporte à central. |
-| ➡️ Próxima parada | Atualiza o andamento da rota. |
-
-A fila offline isola erros definitivos, como respostas HTTP `4xx`, para revisão posterior, sem interromper a sincronização dos demais eventos.
-
----
-
-## 🧠 Engenharia e decisões técnicas
-
-Mais do que uma interface de gestão, o projeto reúne mecanismos de controle operacional, integração e resiliência.
-
-| Camada | Implementação | Objetivo |
-|---|---|---|
-| Interface | React + TypeScript + Vite | Aplicação web modular e tipada. |
-| Backend | Node.js + Express | API e regras de negócio centralizadas. |
-| Persistência | SQLite + WAL | Armazenamento transacional do protótipo. |
-| Autenticação | `scrypt` + sessão HttpOnly | Proteção de credenciais e sessões. |
-| Controle de acesso | RBAC no backend | Permissões conforme o perfil do usuário. |
-| Operação offline | PWA + Service Worker + IndexedDB | Continuidade operacional sem conexão. |
-| Integridade | SHA-256 | Identificação de alterações nos registros de evidência. |
-| Integrações | REST API + Webhooks | Comunicação com serviços externos. |
-
-### 🔐 Segurança e integridade
-
-O projeto incorpora mecanismos específicos para reduzir riscos de acesso indevido e inconsistência operacional:
-
-- **RBAC:** autorização aplicada no backend, não apenas na interface.
-- **Senhas:** armazenamento com derivação criptográfica usando `scrypt`.
-- **Sessões:** utilização de cookies `HttpOnly`.
-- **API Keys:** armazenamento somente do hash SHA-256 da chave.
-- **Webhooks:** validação da assinatura `X-Hub-Signature-256` da Meta.
-- **Idempotência:** identificação única dos eventos offline por `clientEventId`.
-- **Evidências:** arquivos de fotos, PDFs e assinaturas armazenados separadamente dos registros JSON do banco.
-
-> A geração de hash SHA-256 para uma assinatura manuscrita auxilia na identificação de alterações no registro, mas não equivale, isoladamente, a uma assinatura digital certificada ou à comprovação jurídica da identidade do signatário.
-
----
-
-## 👥 Controle de acesso — RBAC
-
-O sistema possui quatro perfis operacionais, com permissões específicas:
-
-| Perfil | Responsabilidade | Usuário de demonstração |
-|---|---|---|
-| `MANAGER` | Dashboard, pedidos, clientes, frota, despacho, indicadores, integrações, usuários e parâmetros. | `gestor@logisticmaster.local` |
-| `DISPATCHER` | Pedidos, clientes, frota, planejamento de carga, mapa, comunicação e logística reversa. | `despacho@logisticmaster.local` |
-| `DRIVER` | Romaneio, documentos offline, geolocalização, entregas, assinaturas e ocorrências. | `motorista@logisticmaster.local` |
-| `SALES_REP` | Cadastro e consulta de pedidos e clientes, com edição antes da alocação. | `vendas@logisticmaster.local` |
-
-**Credencial de demonstração:** `Demo@123` para os usuários listados.
-
-Essas contas são destinadas exclusivamente à avaliação do protótipo. Não utilize essas credenciais em um ambiente de produção.
-
----
-
-## 🏗️ Arquitetura do projeto
-
-A estrutura foi organizada para separar interface, regras operacionais, integração e persistência.
-
-```text
-logistic-master/
-│
-├── Dockerfile
-├── render.yaml
-│
-├── docs/
-│   ├── ESPECIFICACAO-DO-PROTOTIPO.md
-│   └── RELATORIO-DE-VALIDACAO.md
-│
-├── public/
-│   ├── manifest.json
-│   └── sw.js
-│
-├── server/
-│   ├── index.mjs
-│   └── dev.mjs
-│
-└── src/
-    ├── data/
-    │   └── mockData.ts
-    │
-    └── platform/
-        ├── PlatformApp.tsx
-        ├── Views.tsx
-        ├── LoginScreen.tsx
-        ├── api.ts
-        ├── offlineQueue.ts
-        └── types.ts
-```
-
-### Responsabilidade dos principais módulos
-
-| Arquivo | Responsabilidade |
-|---|---|
-| `server/index.mjs` | API Express, autenticação, banco SQLite, regras FEFO/LIFO e armazenamento de evidências. |
-| `server/dev.mjs` | Inicialização coordenada do backend e frontend. |
-| `PlatformApp.tsx` | Aplicação principal, navegação por perfil e sincronização. |
-| `Views.tsx` | Interfaces dos módulos operacionais. |
-| `LoginScreen.tsx` | Autenticação e gerenciamento de sessão. |
-| `api.ts` | Cliente HTTP tipado para comunicação com a API. |
-| `offlineQueue.ts` | Fila de eventos offline e cache de PDFs. |
-| `types.ts` | Contratos e estruturas de dados TypeScript. |
-
----
-
-## 🔌 Integrações
-
-### API REST
-
-O sistema disponibiliza um ponto de entrada para integração com sistemas externos:
-
-```http
-POST /api/integrations/orders
-X-API-Key: SUA_CHAVE_DE_INTEGRACAO
-Content-Type: application/json
-```
-
-As chaves de integração são armazenadas como hash SHA-256, em vez de serem persistidas em texto puro.
-
-### WhatsApp Cloud API — Meta
-
-A integração permite receber eventos de pedidos por webhook, com validação da assinatura HMAC `X-Hub-Signature-256`.
-
-Variáveis necessárias:
-
-```env
-WHATSAPP_ACCESS_TOKEN=
-WHATSAPP_PHONE_NUMBER_ID=
-WHATSAPP_API_VERSION=
-WHATSAPP_VERIFY_TOKEN=
-WHATSAPP_APP_SECRET=
-```
-
-A integração depende da configuração das credenciais e do ambiente da Meta.
-
----
-
-## 🚀 Executar localmente
-
-### Requisitos
-
-- Node.js `>= 22.5.0`
-- npm
-- Git
-
-O projeto utiliza o módulo nativo `node:sqlite`, por isso exige uma versão compatível do Node.js.
-
-### 1. Clonar o repositório
-
-```bash
-git clone https://github.com/gab3souzza/logistic-master.git
-
-cd logistic-master
-```
-
-### 2. Instalar as dependências
+1. Copie `.env.example` para `.env`.
+2. Execute:
 
 ```bash
 npm install
-```
-
-### 3. Iniciar a aplicação
-
-```bash
 npm run dev
 ```
 
-O comando inicia o backend e o frontend simultaneamente.
+3. Abra `http://localhost:3000`.
 
-### 4. Acessar
+O Vite serve a interface e encaminha `/api` para o backend Express na porta 4000. O backend carrega as variáveis de `.env`. Para testar o pacote de produção:
 
-| Serviço | Endereço |
-|---|---|
-| Aplicação web | http://localhost:3000 |
-| API | http://localhost:4000 |
-
-Na primeira execução, o sistema cria automaticamente o banco SQLite e os usuários de demonstração.
-
-### Configuração opcional
-
-As variáveis de ambiente podem ser consultadas em `.env.example`.
-
-Para habilitar a integração com WhatsApp, configure as credenciais da Meta em um arquivo `.env` local. Não publique tokens ou segredos no repositório.
-
----
-
-## ☁️ Deploy de homologação
-
-O repositório já possui configuração para execução utilizando Docker e Render.
-
-Arquivos de configuração:
-
-- `Dockerfile`: build e execução com Node.js 22.
-- `render.yaml`: configuração de deploy via Blueprint.
-
-### Publicação no Render
-
-1. Acesse [Render](https://render.com/).
-2. Selecione **New + → Blueprint** ou **Web Service → Docker**.
-3. Conecte o repositório `gab3souzza/logistic-master`.
-4. Permita que o Render utilize o `render.yaml` para configurar o serviço.
-5. Configure as variáveis de ambiente necessárias.
-
-**Atenção à persistência:** o sistema utiliza SQLite no protótipo. O armazenamento local de planos com sistema de arquivos efêmero pode ser perdido após reinicializações ou novos deploys.
-
-Para uma homologação com persistência, configure um volume em:
-
-```text
-/app/server/data
+```bash
+npm run build
+npm start
 ```
 
-A evolução para PostgreSQL e Object Storage está prevista no roadmap.
+O backend serve a pasta `dist` na porta 4000.
+
+## Acessos de demonstração
+
+Todos os usuários demonstrativos usam a senha `Demo@123`. A tela Configurações permite alterar a senha depois do login.
+
+| Perfil | E-mail |
+|---|---|
+| Gestor / Proprietário | `gestor@logisticmaster.local` |
+| Despachante | `despacho@logisticmaster.local` |
+| Motorista | `motorista@logisticmaster.local` |
+| Vendedor | `vendas@logisticmaster.local` |
+
+Use o perfil de gestor para inicializar os dados demonstrativos e cadastrar os demais usuários. Troque as senhas de demonstração antes de qualquer utilização com dados reais.
+
+## Persistência e segurança
+
+- Banco SQLite persistente em `server/data/logisticmaster.sqlite` (não versionar nem compartilhar esse arquivo com dados reais). Pedidos, veículos, clientes e rotas são registros JSON tipados na tabela `records`; não é ainda o schema relacional normalizado previsto para produção.
+- Senhas derivadas com `scrypt`; sessões aleatórias armazenadas como hash e entregues em cookie `HttpOnly`.
+- Perfis `MANAGER`, `DISPATCHER`, `DRIVER` e `SALES_REP`, com autorização no backend.
+- Registros associados à distribuidora na estrutura de dados. A versão entregue é preparada para um primeiro ambiente/piloto; ainda exige homologação multi-tenant e migração para PostgreSQL antes de escalar comercialmente.
+- Chaves de API guardadas como hash; tokens do WhatsApp ficam somente no servidor.
+
+## PWA do motorista — rota, NF-e e comunicação offline
+
+O perfil `DRIVER` recebe a rota atribuída com clientes na sequência operacional, endereço, janela de recebimento, peso/cubagem e número da NF-e. Na central de Pedidos, use o ícone de arquivo na linha do pedido para anexar o **PDF oficial da DANFE/NF-e** (até 8 MB). O sistema valida o tipo e a assinatura `%PDF-`, armazena o documento vinculado ao pedido e o disponibiliza somente para usuários autorizados da mesma distribuidora; o motorista só pode consultar notas da própria rota ativa.
+
+Quando o motorista abre a rota conectado, o PWA baixa os PDFs anexados para o IndexedDB do aparelho. Depois da sincronização inicial, cada nota pode ser aberta sem internet. Pedidos sem PDF anexado aparecem identificados como `PDF não anexado`. O XML continua sendo utilizado para leitura de dados estruturados e cálculo logístico; **o LogisticMaster não emite nem recria o DANFE oficial**. O documento fiscal precisa vir do ERP/distribuidora.
+
+A tela do motorista também oferece confirmações rápidas (`Cheguei`, `Aguardando`, `Preciso de ajuda` e `Próxima parada`), mensagens curtas para a central, atalho Waze por parada, Google Maps por destino e abertura da sequência no Google Maps. Mensagens, entregas e ocorrências iniciadas sem conexão ficam numa fila local IndexedDB. Cada evento leva um identificador idempotente para reduzir duplicidade no reenvio após reconexão. A página usa Service Worker para manter o shell do PWA disponível após o primeiro carregamento online.
+
+**Preparação de campo:** antes de sair do galpão, o motorista deve abrir a rota enquanto ainda há internet e conferir o indicador `PDFs offline`. O cache é por aparelho/navegador; limpar os dados do site ou trocar de dispositivo remove os documentos armazenados localmente. A sincronização exige reconexão e uma sessão de usuário válida.
+
+## Entrada de pedidos
+
+A tela Pedidos aceita:
+
+1. Cadastro manual.
+2. Importação CSV com cabeçalhos como `nfe`, `customerName`, `cnpj`, `address`, `neighborhood`, `city`, `state`, `weightKg`, `volumeM3`, `totalValue`, `timeWindow`, `lat` e `lng`.
+3. Importação JSON (objeto, lista ou `{ "orders": [...] }`).
+4. XML de NF-e, com extração inicial de destinatário, nota, produtos e tags de rastreabilidade (`nLote`/`dVal`) quando presentes.
+
+Pedidos sem cliente, endereço, peso ou cubagem ficam em complementação. Lotes vencidos são bloqueados; lotes com validade residual de até 65 dias recebem prioridade FEFO. O leitor XML é uma primeira camada e precisa ser homologado com os layouts reais dos fornecedores/ERPs usados pelo cliente.
+
+## API para ERP / sistema de vendas
+
+Crie uma chave em **Integrações** e envie pedidos para:
+
+```http
+POST /api/integrations/orders
+Content-Type: application/json
+X-API-Key: lm_sua_chave
+```
+
+Exemplo:
+
+```json
+{
+  "externalId": "ERP-10456",
+  "nfe": "10456",
+  "customerName": "Mercadinho Exemplo",
+  "cnpj": "00000000000100",
+  "address": "Rua Exemplo, 100",
+  "neighborhood": "Pituba",
+  "city": "Salvador",
+  "state": "BA",
+  "weightKg": 350,
+  "volumeM3": 2.4,
+  "totalValue": 2800,
+  "timeWindow": "08:00-12:00",
+  "items": []
+}
+```
+
+A API aceita um pedido ou `{ "orders": [...] }`. O campo `externalId` pode ser usado como identificador idempotente do sistema de origem. Campos críticos ausentes deixam o pedido em quarentena.
+
+## WhatsApp Business — Meta Cloud API
+
+A tela Integrações mostra se as credenciais estão configuradas e permite testar um envio. Preencha no `.env` do backend:
+
+- `WHATSAPP_ACCESS_TOKEN`
+- `WHATSAPP_PHONE_NUMBER_ID`
+- `WHATSAPP_API_VERSION`
+- `WHATSAPP_VERIFY_TOKEN`
+- `WHATSAPP_APP_SECRET` (validação da assinatura `X-Hub-Signature-256` do webhook)
+
+Webhook: `/api/integrations/whatsapp/webhook`. Mensagens de texto recebidas entram em `pendente_complemento` para conferência humana. O parser semântico por IA e o disparo automático de avisos por ETA ainda não estão habilitados nesta versão. O webhook rejeita eventos sem assinatura válida quando o segredo da aplicação está configurado. A integração real depende de conta empresarial, aplicação Meta, permissões e configuração do webhook.
+
+## Regras operacionais implementadas
+
+- Alocação determinística por peso e cubagem, com teto operacional configurável.
+- Prioridade de pedidos reagendados D+1 e lotes FEFO urgentes.
+- Sequência de paradas por janela de atendimento; posição física 1 junto à porta do baú.
+- Início de rota separado da montagem do carregamento.
+- Calculadora Hoje vs. Amanhã no backend, com recomendação por piso de margem e registro de decisão do gestor.
+- Entrega integral ou parcial, baixa proporcional de peso/cubagem, assinatura e GPS.
+- Geofence de até 30 metros quando existem coordenadas confiáveis do cliente.
+- Ocorrência exige motivo, foto e localização.
+- Retorno ao galpão com reagendamento D+1 ou baixa por avaria.
+- Custo padrão estimado de reentrega: `(km extra ÷ km/L × preço diesel) + (horas × custo equipe)`.
+- Geocodificação de endereço por OpenStreetMap Nominatim e navegação externa.
+- PWA do motorista com confirmações/mensagens rápidas, fila IndexedDB offline, PDFs oficiais da NF-e em cache por rota, Waze por parada e Google Maps por destino/rota; eventos de entrega e ocorrência usam identificadores idempotentes na sincronização.
+
+## Limitações antes de produção
+
+- A instalação das dependências, build e execução com Vite/Express devem ser concluídas em um ambiente com acesso ao registry npm. Nesta sessão, a instalação expirou; a sintaxe do backend e a transpilação sintática dos arquivos TSX foram verificadas, mas o build completo não foi homologado.
+- O banco atual é SQLite para prototipagem; migrar para PostgreSQL e implementar migrations, índices, backups e isolamento multiempresa.
+- A heurística de alocação não substitui homologação física do carregamento. Empilhamento por resistência/fragilidade por SKU ainda precisa ser aprofundado.
+- O mapa atual é de referência: não há roteirizador geográfico profissional, cálculo de ETA por trânsito, rastreamento contínuo ou polígonos ZRTC da Transalvador homologados.
+- A entrega parcial é contabilizada por peso total recusado; a conferência detalhada por SKU/quantidade ainda precisa ser adicionada.
+- O modo offline é uma camada de contingência: requer primeiro acesso online, sessão local válida e sincronização da rota/PDFs antes da saída. Conflitos complexos entre ações físicas offline e alterações remotas ainda exigem homologação; não se deve presumir disponibilidade ininterrupta por quatro horas em qualquer aparelho.
+- O webhook de WhatsApp precisa ser protegido e homologado em ambiente Meta real antes de receber tráfego de produção.
+- Hospede o backend em Node.js com disco persistente; hospedagem estática/serverless com filesystem efêmero não mantém o SQLite.
+- Realize testes de segurança, LGPD, retenção de fotos/assinaturas, backups e operação de campo antes do uso comercial.
+
+Consulte `docs/ESPECIFICACAO-DO-PROTOTIPO.md` para a matriz detalhada de escopo, processos, estados e pendências.
+
 
 ---
 
-## 🛣️ Roadmap — Próximos marcos
+## Correções aplicadas na V1.2 (Pronta para Hospedagem Teste)
 
-O protótipo estabelece a base operacional. Os próximos passos concentram-se em escalabilidade, validação física e robustez para uso comercial.
+- **Dependências corrigidas (`package.json`):** versões reais e compatíveis (`vite ^6.2.0`, `@vitejs/plugin-react ^4.3.4`, `react ^19.0.0`, `typescript ^5.7.3`).
+- **Vínculo de motorista por ID (`driverUserId`):** substitui a comparação frágil por nome em texto; `GET /api/drivers` popula o seletor de motorista na frota.
+- **Fila offline sem travamento (`offlineQueue.ts`):** erros `4xx` definitivos (ex.: geofence `422`) são isolados em `failed_mutations` com opção de descarte, sem travar as entregas seguintes; `401` pausa para reautenticação.
+- **Preservação de clientes (`retailers`):** novos pedidos/importações preservam coordenadas (`lat/lng`), `avgUnloadMinutes` e `completedDeliveriesCount`.
+- **Evidências fora do SQLite + Hash SHA-256 (RN-16) + MMS (RN-13):** assinaturas e fotos de ocorrência são gravadas em disco (`server/data/evidence/`) e consultáveis em `GET /api/orders/:id/evidence/:kind`, mantendo `/api/bootstrap` leve.
+- **Webhook WhatsApp multi-tenant e Cancelamento em rota (RN-15):** roteamento por `phone_number_id` e endpoint `POST /api/orders/:id/cancel-in-route` (> 500m vs. ≤ 500m).
+- **Deploy pronto (`Dockerfile` + `render.yaml`):** Node 22 garantido (`node:sqlite`), `trust proxy` ativo e `ENABLE_DEMO_USERS=true` liberado para ambiente de teste.
 
-- [ ] **PostgreSQL multi-tenant:** substituir a persistência SQLite por banco relacional normalizado, com DDL, triggers PL/pgSQL e suíte de testes `pgTAP` especificados.
-- [ ] **Empilhamento físico inteligente:** validar resistência das embalagens e regras `HEAVY_BASE` / `FRAGILE_TOP` (RN-02.1).
-- [ ] **Roteirização avançada:** integrar matriz real de distâncias, monitoramento contínuo de ETA e polígonos oficiais da ZRTC de Salvador (RN-06).
-- [ ] **Object Storage:** migrar fotos, PDFs e assinaturas para S3/R2, com políticas de retenção e auditoria LGPD.
-- [ ] **Validação em campo:** testar os fluxos com uma operação real de distribuição e confrontar os resultados com indicadores operacionais.
+## Como subir em hospedagem teste em 3 minutos (Render.com — Grátis)
 
----
-
-## 📚 Documentação complementar
-
-O repositório conta com documentação específica para aprofundamento técnico e avaliação do projeto:
-
-- [`ESPECIFICACAO-DO-PROTOTIPO.md`](docs/ESPECIFICACAO-DO-PROTOTIPO.md) — requisitos, regras de negócio e especificação funcional.
-- [`RELATORIO-DE-VALIDACAO.md`](docs/RELATORIO-DE-VALIDACAO.md) — relatório de validação do protótipo.
-
----
-
-## 👨‍💻 Autoria e desenvolvimento
-
-Projeto idealizado e conduzido por **Gabriel Santana Souza**, desenvolvido no âmbito do curso de **Análise e Desenvolvimento de Sistemas — UCSAL**, na disciplina CST300.
-
-**Equipe de desenvolvimento:**
-- Gabriel Santana Souza
-- Raiana Firmino Lima
-- Glauco Helder Drumond da Encarnação
-
-**Repositório:** [github.com/gab3souzza/logistic-master](https://github.com/gab3souzza/logistic-master)
-
----
-
-<p align="center">
-  <strong>LogisticMaster — Logística inteligente, margem protegida.</strong>
-  <br>
-  <sub>Da entrada do pedido à comprovação da entrega.</sub>
-</p>
+1. Extraia o ZIP e suba a pasta `LogisticMaster` para um repositório no seu GitHub.
+2. Acesse [render.com](https://render.com) → **New +** → **Blueprint** (ou **Web Service** escolhendo **Docker**).
+3. Conecte o repositório: o Render detecta automaticamente o `render.yaml` e o `Dockerfile` (Node 22 + build Vite + Express).
+4. Ao finalizar o deploy, abra a URL HTTPS gerada e teste os 4 perfis (`Demo@123`). *(No plano gratuito do Render o disco reinicia após inatividade; para manter o SQLite entre reinícios, basta anexar um Persistent Disk em `/app/server/data` ou migrar para PostgreSQL.)*
