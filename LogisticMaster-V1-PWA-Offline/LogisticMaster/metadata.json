@@ -1,6 +1,0 @@
-{
-  "name": "LogisticMaster — Plataforma Operacional de Logística",
-  "description": "Pedidos, carregamento, frota, despacho, geolocalização, entregas e logística reversa para distribuidoras.",
-  "requestFramePermissions": ["geolocation"],
-  "majorCapabilities": ["ROLE_BASED_ACCESS", "PERSISTENT_DATABASE", "ORDER_IMPORT", "FLEET_CAPACITY_OPTIMIZATION", "DELIVERY_GEOFENCING", "EXTERNAL_ORDER_API"]
-}
